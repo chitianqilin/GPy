@@ -1,4 +1,4 @@
-# Author Tianqi Wei
+# Author Tianqi Wei 2019
 
 import numpy as np
 from .kern import Kern
@@ -16,8 +16,8 @@ class KFFLFM(Kern):
     by Guarnizo, Cristian, and Mauricio A. Álvarez. arXiv preprint arXiv:1805.07460 (2018).
     """
 
-    def __init__(self, input_dim, output_dim, scale=None, mass=None, spring=None, damper=None, nfs=10, fs=None,
-                 active_dims=None, name='kfflfm'):
+    def __init__(self, input_dim, output_dim, scale=None, mass=None, spring=None, damper=None, sensitivity=None,
+                 nfs=10, fs=None, active_dims=None, name='kfflfm'):
 
         super(KFFLFM, self).__init__(input_dim, active_dims, name)
         self.output_dim = output_dim
@@ -38,7 +38,11 @@ class KFFLFM(Kern):
             damper = np.random.rand(self.output_dim)
         self.damper = Param('scale', damper, Logexp())
 
-        self.link_parameters(self.scale, self.mass, self.spring, self.damper, self.nfs)
+        if sensitivity is None:
+            sensitivity = np.ones(self.output_dim, self.input_dim)
+        self.sensitivity = sensitivity
+
+        self.link_parameters(self.scale, self.mass, self.spring, self.damper, self.sensitivity)
 
         # nfs is abbreviation of "number of frequency samples", which is a variable for the Random Fourier Features
         # nfs is a constant during optimisation.
@@ -51,10 +55,13 @@ class KFFLFM(Kern):
         else:
             self.fs = fs
 
-        alpha(1) = lfmKern1.damper. / (2 * lfmKern1.mass)
-        alpha(2) = lfmKern2.damper. / (2 * lfmKern2.mass)
-        omega(1) = sqrt(lfmKern1.spring. / lfmKern1.mass - alpha(1) * alpha(1))
-        omega(2) = sqrt(lfmKern2.spring. / lfmKern2.mass - alpha(2) * alpha(2))
+        self.recalculate_intermediate_variables()
+
+    def recalculate_intermediate_variables(self):
+
+        # alpha and omega are intermediate variables used in the model and gradient for optimisation
+        self.alpha = self.damper / (2 * self.mass)
+        self.omega = np.sqrt(self.spring / self.mass - self.alpha * self.alpha)
 
 
     def parameters_changed(self):
@@ -63,27 +70,25 @@ class KFFLFM(Kern):
         "pass"
         It describes the behaviours of the class when the "parameters" of a kernel are updated.
         '''
-        self.GPCoregionalizedRegressionB = np.dot(self.W, self.W.T) + np.diag(self.kappa)
+        self.recalculate_intermediate_variables()
 
     def K(self, X, X2=None):
-        if use_coregionalize_cython:
-            return self._K_cython(X, X2)
-        else:
-            return self._K_numpy(X, X2)
+        """
+        Compute the kernel function.
 
+        .. math::
+            K_{ij} = k(X_i, X_j)
 
-    def _K_numpy(self, X, X2=None):
-        index = np.asarray(X, dtype=np.int)
+        :param X: the first set of inputs to the kernel
+        :param X2: (optional) the second set of arguments to the kernel. If X2
+                   is None, this is passed throgh to the 'part' object, which
+                   handLes this as X2 == X.
+        """
         if X2 is None:
-            return self.B[index,index.T]
-        else:
-            index2 = np.asarray(X2, dtype=np.int)
-            return self.B[index,index2.T]
+            X = X2
 
-    def _K_cython(self, X, X2=None):
-        if X2 is None:
-            return coregionalize_cython.K_symmetric(self.B, np.asarray(X, dtype=np.int64)[:,0])
-        return coregionalize_cython.K_asymmetric(self.B, np.asarray(X, dtype=np.int64)[:,0], np.asarray(X2, dtype=np.int64)[:,0])
+    def ComputeC(self):
+        self.C = self.omega / (self.alpha ^ 2 + self.omega ^ 2 - lambda.^ 2 + 1i * 2 * alpha * lambda);
 
 
     def Kdiag(self, X):
