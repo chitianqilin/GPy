@@ -814,7 +814,8 @@ class Kernel_Psi_statistics_GradientTests(unittest.TestCase):
 if __name__ == "__main__":
     print("Running unit tests, please be (very) patient...")
     unittest.main()
-
+ #   test = KernelGradientTestsContinuous()
+ #   test.test_MultioutputKern()
 #     np.random.seed(0)
 #     N0 = 3
 #     N1 = 9
