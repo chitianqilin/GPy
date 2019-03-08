@@ -122,7 +122,7 @@ void C_UpsilonMatrix(
     
 {
 
-  cout<<gamma<<" "<< sigma2 <<" "<<rows<<" "<<cols<<" "<< endl;
+  cout<<"gamma="<<gamma<<" sigma2="<< sigma2 <<" rows="<<rows<<" cols="<<cols<<" "<< endl;
   for (int i=0;i<rows; i++)
   {
     cout<<"t1[" <<i<< "] = "<<t1[i]<<"\n";

@@ -10,6 +10,9 @@ from paramz.transformations import Logexp
 from GPy.kern.src.independent_outputs import index_to_slices
 from . import lfm_C
 from GPy.kern.src.kern import Kern
+from .rbf import RBF
+#from .lfm import LFMXLFM, LFMXRBF
+#from .multioutput_kern import MultioutputKern
 #import numpy as np
 #from ...core.parameterization import Param
 # from paramz.transformations import Logexp
@@ -25,26 +28,33 @@ def cell(d0, d1):
     else:
         return [[None for _ in range(d1)] for _ in range(d0)]
 
+
 def lfmUpsilonMatrix(gamma1_p, sigma2, X, X2):
     print((gamma1_p, sigma2, X, X2))
     return lfm_C.UpsilonMatrix(gamma1_p, sigma2, X.astype(np.float64), X2.astype(np.float64))
 
+
 def lfmUpsilonVector(gamma1_p, sigma2, X):
     return lfm_C.UpsilonVector(gamma1_p, sigma2, X.astype(np.float64))
+
 
 def lfmGradientUpsilonMatrix(gamma1_p, sigma2, X, X2):
     return lfm_C.GradientUpsilonMatrix(gamma1_p, sigma2, X.astype(np.float64), X2.astype(np.float64))
 
+
 def lfmGradientUpsilonVector(gamma1_p, sigma2, X):
     return lfm_C.GradientUpsilonVector(gamma1_p, sigma2, X.astype(np.float64))
+
 
 def lfmGradientSigmaUpsilonMatrix(gamma1_p, sigma2, X, X2):
     return lfm_C.GradientSigmaUpsilonMatrix(gamma1_p, sigma2, X.astype(np.float64), X2.astype(np.float64))
 
+
 def lfmGradientSigmaUpsilonVector(gamma1_p, sigma2, X):
     return lfm_C.GradientSigmaUpsilonVector(gamma1_p, sigma2, X.astype(np.float64))
 
-def lfmComputeH3( gamma1_p, gamma1_m, sigma2, X, X2, preFactor, mode=None, term=None):
+
+def lfmComputeH3(gamma1_p, gamma1_m, sigma2, X, X2, preFactor, mode=None, term=None):
     # LFMCOMPUTEH3 Helper function for computing part of the LFM kernel.
     # FORMAT
     # DESC computes a portion of the LFM kernel.
@@ -70,6 +80,7 @@ def lfmComputeH3( gamma1_p, gamma1_m, sigma2, X, X2, preFactor, mode=None, term=
         upsilon = np.hstack([lfmUpsilonMatrix(gamma1_p, sigma2, X, X2), lfmUpsilonMatrix(gamma1_m, sigma2, X, X2)])
         h = preFactor[0] * upsilon + preFactor[1] * upsilon
     return [h, upsilon]
+
 
 def lfmComputeH4(gamma1_p, gamma1_m, sigma2, X, preFactor, preExp, mode=None, term=None ):
     # LFMCOMPUTEH4 Helper function for computing part of the LFM kernel.
@@ -98,6 +109,7 @@ def lfmComputeH4(gamma1_p, gamma1_m, sigma2, X, preFactor, preExp, mode=None, te
         h = np.matmul(upsilon[0], (preExp[:, 0] / preFactor[0] - preExp[:, 1] / preFactor[1]).T) \
             + np.matmul(upsilon[1] * (preExp[:, 1] / preFactor[2] - preExp[:, 0] / preFactor[3]).T)
     return [h, upsilon]
+
 
 def lfmGradientH31(preFactor, preFactorGrad, gradThetaGamma, gradUpsilon1, gradUpsilon2, compUpsilon1, compUpsilon2, mode, term=None):
 
@@ -134,6 +146,7 @@ def lfmGradientH31(preFactor, preFactorGrad, gradThetaGamma, gradUpsilon1, gradU
             + (preFactor[1]*gradUpsilon2 + preFactorGrad[1]*compUpsilon2)*gradThetaGamma[1]
     return g
 
+
 def lfmGradientH32(preFactor, gradThetaGamma, compUpsilon1,compUpsilon2, mode, term=None):
     # LFMGRADIENTH32 Gradient of the function h_i(z) with respect to some of the
     # hyperparameters of the kernel: m_k, C_k, D_k, m_r, C_r or D_r.
@@ -163,6 +176,7 @@ def lfmGradientH32(preFactor, gradThetaGamma, compUpsilon1,compUpsilon2, mode, t
         g = compUpsilon1*(-(gradThetaGamma[1]/preFactor[2]) + (gradThetaGamma[0]/preFactor[0])) \
             + compUpsilon2*(-(gradThetaGamma[0]/preFactor[1]) + (gradThetaGamma[1]/preFactor[3]))
     return g
+
 
 def lfmGradientH41(preFactor, preFactorGrad, gradThetaGamma, preExp, gradUpsilon1, gradUpsilon2, compUpsilon1, compUpsilon2, mode, term=None):
     # LFMGRADIENTH41 Gradient of the function h_i(z) with respect to some of the
@@ -266,6 +280,7 @@ def lfmGradientSigmaH3(gamma1, gamma2, sigma2, X, X2, preFactor, mode, term=None
             preFactor[1] * lfmGradientSigmaUpsilonMatrix(gamma2, sigma2, X, X2)
     return g
 
+
 def lfmGradientSigmaH4(gamma1, gamma2, sigma2, X, preFactor, preExp, mode, term):
     # LFMGRADIENTSIGMAH4 Gradient of the function h_i(z) with respect \sigma.
     # FORMAT
@@ -312,11 +327,13 @@ def lfmDiagComputeH4(gamma, sigma2, t, factor, preExp, mode):
         vec = upsi*preExp/factor[0] - 2*np.real(temp2)
     return [vec, upsi]
 
+
 def lfmDiagGradientH3(gamma, t, factor, preExp, compUpsilon, gradUpsilon, termH, preFactorGrad, gradTheta):
     expUpsilon = preExp*compUpsilon
     pgrad = - expUpsilon*(2/preFactorGrad**2)*gradTheta[0] - \
             (t*termH + preExp*gradUpsilon*factor[0] - expUpsilon*(1/gamma**2 - 2/preFactorGrad**2))*gradTheta[1]
     return pgrad
+
 
 def lfmDiagGradientH4( t, factor, preExp, compUpsilon, gradUpsilon, gradTheta):
     pgrad = 2*preExp[:,1] * compUpsilon * (t/factor[1] + 1/factor[1]**2)*gradTheta[0] \
@@ -324,6 +341,7 @@ def lfmDiagGradientH4( t, factor, preExp, compUpsilon, gradUpsilon, gradTheta):
             - compUpsilon * (t * preExp[:,0]/factor[0] + preExp[:,0]/factor[0]**2
             -  2*preExp[:,1]/factor[1]**2))*gradTheta[1]
     return pgrad
+
 
 def lfmDiagGradientSH3(gamma, sigma2, t, factor, preExp, mode):
     upsi = lfmGradientSigmaUpsilonVector(gamma ,sigma2, t)
@@ -334,14 +352,21 @@ def lfmDiagGradientSH3(gamma, sigma2, t, factor, preExp, mode):
         vec = 2*np.real(temp/factor[0]) - temp/factor[1]
     return [vec, upsi]
 
+
 def lfmDiagGradientSH4(gamma, sigma2, t, factor, preExp, mode):
     upsi = lfmGradientSigmaUpsilonVector(gamma ,sigma2, t)
     if mode:
-        vec = (preExp[:,0]/factor[0] -  2*preExp[:,1]/factor[1]) * upsi
+        vec = (preExp[:, 0]/factor[0] - 2*preExp[:, 1]/factor[1]) * upsi
     else:
         temp2 = upsi * np.conj(preExp)/factor[1]
         vec = upsi * preExp/factor[0] - 2*np.real(temp2)
     return [vec, upsi]
+
+
+class UnilateralKernelParameters:
+    def __init__(self, type="LFM", name="LFM"):
+        self.type = "LFM"
+        self.name = "LFM"
 
 
 class LFM(Kern):
@@ -372,37 +397,58 @@ class LFM(Kern):
     .. note: see coregionalization examples in GPy.examples.regression for some usage.
     """
 
-    def __init__(self, input_dim, output_dim, scale=None, mass=None, spring=None, damper=None, sensitivity=None,
-                 active_dims=None, isNormalised=None, name='lfm'):
 
+    def __init__(self, unilateral_kernel_types, input_dim=2, active_dims=None, inv_lengthscales=None, mass=None,
+                 spring=None, damper=None, sensitivity=None,  isNormalised=None, name='multigp'):
         super(LFM, self).__init__(input_dim, active_dims, name)
-        self.output_dim = output_dim
+        # assert len(unilateral_kernel_types) == len(input_sizes), "the input_types should has the same length with input_size"
+        self.kernel_types = unilateral_kernel_types
+        # self.input_sizes = input_sizes
+        # self.input_dims = input_dims
+        self.type_length = len(unilateral_kernel_types)
+        # self.inv_lengthscales =  Param('inv_lengthscales', inv_lengthscales)
+        # self.link_parameter(self.inv_lengthscales)
+        self.output_dim = len(unilateral_kernel_types)
 
-        if scale is None:
-            scale =  np.ones(self.output_dim) # np.random.rand(self.output_dim)
-        self.scale = Param('scale', scale)
+        self.unilateral_kernels = cell(self.type_length, 1)
+        for i in range(self.type_length):
+            if self.kernel_types[i] == "RBF":
+                self.unilateral_kernels[i] = UnilateralKernelParameters(type="RBF", name="RBF")
+                self.unilateral_kernels[i].inv_l = Param('inv_lengthscale', 1./self.lengthscale[i]**2, Logexp())
+                self.link_parameter(self.inv_l)
+                if isNormalised is None:
+                    isNormalised = True
+                self.unilateral_kernels[i].isNormalised = next(isNormalised)
 
-        if mass is None:
-            mass =  np.ones(self.output_dim) # np.random.rand(self.output_dim)
-        self.mass = Param('mass', mass)
+            if self.kernel_types[i] == "LFM":
+                self.unilateral_kernels[i] = UnilateralKernelParameters(type="LFM", name="LFM")
+                self.unilateral_kernels[i].inv_l = Param('inv_lengthscale', inv_lengthscales[i], Logexp())
+                if mass is None:
+                    mass = 1
+                self.unilateral_kernels[i].mass = Param('scale', next(mass))
+                if spring is None:
+                    spring = 1
+                self.unilateral_kernels[i].spring = Param('scale', next(spring))
+                if damper is None:
+                    damper = 1
+                self.unilateral_kernels[i].damper = Param('scale', next(damper))
+                if sensitivity is None:
+                    sensitivity = 1
+                self.unilateral_kernels[i].sensitivity = Param('sensitivity', next(sensitivity))
 
-        if spring is None:
-            spring =  np.ones(self.output_dim) # np.random.rand(self.output_dim)
-        self.spring = Param('spring', spring)
+                self.link_parameters(self.unilateral_kernels[i].inv_l,
+                                     self.unilateral_kernels[i].mass,
+                                     self.unilateral_kernels[i].spring,
+                                     self.unilateral_kernels[i].damper,
+                                     self.unilateral_kernels[i].sensitivity)
+                if isNormalised is None:
+                    isNormalised = True
+                self.unilateral_kernels[i].isNormalised = next(isNormalised)
 
-        if damper is None:
-            damper = np.ones(self.output_dim) # np.random.rand(self.output_dim)
-        self.damper = Param('damper', damper)
-
-        if sensitivity is None:
-            sensitivity =  np.ones(self.output_dim) #np.random.rand(self.output_dim) # np.ones((self.output_dim, self.input_dim))
-        self.sensitivity = Param('sensitivity', sensitivity)
-
-        self.link_parameters(self.scale, self.mass, self.spring, self.damper, self.sensitivity)
-
-        if isNormalised is None:
-            isNormalised = [True for _ in range(self.output_dim)]
-        self.isNormalised = isNormalised
+        self.cross_kernel_matrix = cell(self.type_length, self.type_length)
+        for i in range(self.type_length):
+            for j in range(self.type_length):
+                self.cross_kernel_matrix[i][j] = unilateral_kernel_types[i] + "X" + unilateral_kernel_types[j]
 
         self.recalculate_intermediate_variables()
 
@@ -410,18 +456,17 @@ class LFM(Kern):
         self.index_dim = -1
 
 
-
     def recalculate_intermediate_variables(self):
-        # Get length scale out.
-        self.sigma2 = self.scale
-        self.sigma = csqrt(self.sigma2)
-        # alpha and omega are intermediate variables used in the model and gradient for optimisation
-        self.alpha = self.damper / (2 * self.mass)
-        self.omega = csqrt(self.spring / self.mass - self.alpha * self.alpha)
-        print(self.omega)
-        self.omega_isreal = np.isreal(self.omega)
+        for i in range(self.type_length):
+            if self.kernel_types[i]  == "LFM":
+                self.unilateral_kernels[i].sigma2 = 2/self.unilateral_kernels[i].inv_l
+                self.unilateral_kernels[i].sigma = csqrt(self.unilateral_kernels[i].sigma2)
+                # alpha and omega are intermediate variables used in the model and gradient for optimisation
+                self.unilateral_kernels[i].alpha = self.unilateral_kernels[i].damper / (2 * self.unilateral_kernels[i].mass)
+                self.unilateral_kernels[i].omega = csqrt(self.unilateral_kernels[i].spring / self.unilateral_kernels[i].mass - self.unilateral_kernels[i].alpha * self.unilateral_kernels[i].alpha)
+                self.unilateral_kernels[i].omega_isreal = np.isreal(self.unilateral_kernels[i].omega)
+                self.unilateral_kernels[i].gamma = self.unilateral_kernels[i].alpha + 1j * self.unilateral_kernels[i].omega
 
-        self.gamma = self.alpha + 1j * self.omega
 
     def parameters_changed(self):
         '''
@@ -430,19 +475,14 @@ class LFM(Kern):
         It describes the behaviours of the class when the "parameters" of a kernel are updated.
         '''
         self.recalculate_intermediate_variables()
-        # super(LFM, self).parameters_changed()
-
+        super(LFM, self).parameters_changed()
 
 
     def K(self, X, X2=None):
         if X2 is None:
             X2 = X
-        print('X2')
-        print(X2)
         slices = index_to_slices(X[:, self.index_dim])
         slices2 = index_to_slices(X2[:, self.index_dim])
-        # slices = index_to_slices(self.output_index)
-        # slices2 = index_to_slices(self.output_index)
         target = np.zeros((X.shape[0], X2.shape[0]))
         for i in range(len(slices)):
             for j in range(len(slices2)):
@@ -452,23 +492,35 @@ class LFM(Kern):
                         target.__setitem__((slices[i][k], slices2[j][l]), K_sub_matrix)
         return target
 
+    def K_sub_matrix(self, q1, X, q2=None, X2=None):
+        if X2 is None:
+            X2 = X
+        if q2 is None:
+            q2 = q1
+        if self.unilateral_kernels[q1].type == "LFM" and self.unilateral_kernels[q2].type == "LFM":
+            K_sub = self.K_sub_matrix_LFMXLFM(self.unilateral_kernels[q1], X, self.unilateral_kernels[q2], X2)
+        elif self.unilateral_kernels[q1].type == "LFM" and self.unilateral_kernels[q2].type == "RBF":
+            K_sub = self.K_sub_matrix_LFMXRBF(self.unilateral_kernels[q1], X, self.unilateral_kernels[q2], X2)
+        elif self.unilateral_kernels[q1].type == "RBF" and self.unilateral_kernels[q2].type == "RBF":
+            K_sub = self.K_sub_matrix_RBFXRBF(self.unilateral_kernels[q1], X, self.unilateral_kernels[q2], X2)
+        return K_sub
 
-    def K_sub_matrix(self, q, X, q2= None, X2=None):
+    def K_sub_matrix_LFMXLFM(self, q1, X, q2= None, X2=None):
         # This K is a sub matrix as a part of K. It is covariance matrix between a pair of outputs.
         # The variable q and q2 are the index of outputs.
         # The variable X and X2 are subset of the X and X2 in K.
         if X2 is None:
             X2 = X
         if q2 is None:
-            q2 = q
+            q2 = q1
         assert (X.shape[1] == 1 and X.shape[1] == 1), 'Input can only have one column'# + str(X) + str(X2)
 
         # Creation  of the time matrices
 
-        if self.omega_isreal[q] and self.omega_isreal[q2]:
+        if self.unilateral_kernels[q1].omega_isreal and self.unilateral_kernels[q2].omega_isreal :
             # Pre-computations to increase speed
-            gamma1 = self.alpha[q] + 1j * self.omega[q]
-            gamma2 = self.alpha[q2] + 1j * self.omega[q2]
+            gamma1 = self.unilateral_kernels[q1].alpha + 1j * self.unilateral_kernels[q1].omega
+            gamma2 = self.unilateral_kernels[q2].alpha + 1j * self.unilateral_kernels[q2].omega
             # print('gamma1')
             # print(gamma1)
             # print('gamma2')
@@ -481,27 +533,28 @@ class LFM(Kern):
             preExp2 = np.exp(-gamma2 * X2)
             # Actual computation  of the kernel
             sK = np.real(
-                        lfmComputeH3(gamma1, gamma2, self.scale[q], X, X2, preConsX, 0, 1)[0]
-                        + lfmComputeH3(gamma2, gamma1, self.scale[q], X2, X, preConsX[1] - preConsX[0], 0, 0)[0].T
-                        + lfmComputeH4(gamma1, gamma2, self.scale[q], X, preGamma, preExp2, 0, 1)[0]
-                        + lfmComputeH4(gamma2, gamma1, self.scale[q], X2, preGamma, preExp1, 0, 0)[0].T
+                        lfmComputeH3(gamma1, gamma2, self.unilateral_kernels[q1].scale, X, X2, preConsX, 0, 1)[0]
+                        + lfmComputeH3(gamma2, gamma1, self.unilateral_kernels[q1].scale, X2, X, preConsX[1] - preConsX[0], 0, 0)[0].T
+                        + lfmComputeH4(gamma1, gamma2, self.unilateral_kernels[q1].scale, X, preGamma, preExp2, 0, 1)[0]
+                        + lfmComputeH4(gamma2, gamma1, self.unilateral_kernels[q1].scale, X2, preGamma, preExp1, 0, 0)[0].T
                         )
-            if self.isNormalised[q]:
-                K0 = (self.sensitivity[q] * self.sensitivity[q2]) / (
-                        4 * csqrt(2) * self.mass[q] * self.mass[q2] * self.omega[q]*self.omega[q2])
+            if self.unilateral_kernels[q1].isNormalised:
+                K0 = (self.unilateral_kernels[q1].sensitivity * self.sensitivity[q2]) / (
+                        4 * csqrt(2) * self.unilateral_kernels[q1].mass * self.unilateral_kernels[q2].mass
+                        * self.unilateral_kernels[q1].omega*self.unilateral_kernels[q2].omega)
             else:
-                K0 = (csqrt(self.scale[q]) * csqrt(np.pi) * self.sensitivity[q] * self.sensitivity[q2]) / (
-                        4 * self.mass[q] * self.mass[q2] * self.omega[q]*self.omega[q2])
+                K0 = (csqrt(self.unilateral_kernels[q1].sigma) * csqrt(np.pi) * self.unilateral_kernels[q1].sensitivity * self.unilateral_kernels[q2].sensitivity) / (
+                        4 * self.unilateral_kernels[q1].mass * self.unilateral_kernels[q2].mass * self.unilateral_kernels[q1].omega*self.unilateral_kernels[q2].omega)
 
             K = K0 * sK
         else:
             # Pre-computations to increase the speed
             preExp1 = np.zeros((np.max(np.shape(X)), 2))
             preExp2 = np.zeros((np.max(np.shape(X2)), 2))
-            gamma1_p = self.alpha[q]  + 1j * self.omega[q]
-            gamma1_m = self.alpha[q]  - 1j * self.omega[q]
-            gamma2_p = self.alpha[q2] + 1j * self.omega[q2]
-            gamma2_m = self.alpha[q2] - 1j * self.omega[q2]
+            gamma1_p = self.unilateral_kernels[q1].alpha + 1j * self.unilateral_kernels[q1].omega
+            gamma1_m = self.unilateral_kernels[q1].alpha - 1j * self.unilateral_kernels[q1].omega
+            gamma2_p = self.unilateral_kernels[q2].alpha + 1j * self.unilateral_kernels[q2].omega
+            gamma2_m = self.unilateral_kernels[q2].alpha - 1j * self.unilateral_kernels[q2].omega
             preGamma = np.array([   gamma1_p + gamma2_p,
                                     gamma1_p + gamma2_m,
                                     gamma1_m + gamma2_p,
@@ -519,33 +572,44 @@ class LFM(Kern):
             preExp2[:, 1] = np.exp(-gamma2_m * X2).ravel()
             # Actual  computation of the kernel
             sK = (
-                    lfmComputeH3(gamma1_p, gamma1_m, self.scale[q], X, X2, preFactors[np.array([0, 1])], 1)[0]
-                    + lfmComputeH3(gamma2_p, gamma2_m, self.scale[q], X2, X, preFactors[np.array([2, 3])], 1)[0].T
-                    + lfmComputeH4(gamma1_p, gamma1_m, self.scale[q], X, preGamma[np.array([0, 1, 3, 2])], preExp2, 1)[0]
-                    + lfmComputeH4(gamma2_p, gamma2_m, self.scale[q], X2, preGamma[np.array([0, 2, 3, 1])], preExp1, 1)[0].T
+                    lfmComputeH3(gamma1_p, gamma1_m, self.unilateral_kernels[q1].scale, X, X2, preFactors[np.array([0, 1])], 1)[0]
+                    + lfmComputeH3(gamma2_p, gamma2_m, self.unilateral_kernels[q1].scale, X2, X, preFactors[np.array([2, 3])], 1)[0].T
+                    + lfmComputeH4(gamma1_p, gamma1_m, self.unilateral_kernels[q1].scale, X, preGamma[np.array([0, 1, 3, 2])], preExp2, 1)[0]
+                    + lfmComputeH4(gamma2_p, gamma2_m, self.unilateral_kernels[q1].scale, X2, preGamma[np.array([0, 2, 3, 1])], preExp1, 1)[0].T
                 )
-            if self.isNormalised[q]:
-                K0 = (self.sensitivity[q] * self.sensitivity[q2]) / (
-                        8 * csqrt(2) * self.mass[q] * self.mass [q2]*  self.omega[q]*self.omega[q2])
+            if self.unilateral_kernels[q1].isNormalised:
+                K0 = (self.unilateral_kernels[q1].sensitivity * self.unilateral_kernels[q2].sensitivity) \
+                     / (8 * csqrt(2) * self.unilateral_kernels[q1].mass * self.unilateral_kernels[q2].mass *
+                        self.unilateral_kernels[q1].omega * self.unilateral_kernels[q2].omega)
             else:
-                K0 = (csqrt(self.scale[q]) * csqrt(np.pi) * self.sensitivity[q] * self.sensitivity[q2]) / (
-                        8 * self.mass[q] * self.mass[q2] *  self.omega[q]*self.omega[q2])
-
+                K0 = (csqrt(self.unilateral_kernels[q1].scale) * csqrt(np.pi) *
+                      self.unilateral_kernels[q1].sensitivity * self.unilateral_kernels[q2].sensitivity) \
+                     / (8 * self.unilateral_kernels[q1].mass * self.unilateral_kernels[q2].mass
+                        * self.unilateral_kernels[q1].omega * self.unilateral_kernels[q2].omega)
             K = K0 * sK
         return K
+
 
     def Kdiag(self, X):
         assert X.shape[1] == 2, 'Input can only have one column'
         slices = index_to_slices(X[:,self.index_dim])
         target = np.zeros((X.shape[0]))  #.astype(np.complex128)
-        for q, slices_i in zip(range(self.output_dim), slices):
+        for q1, slices_i in zip(range(self.output_dim), slices):
             for s in slices_i:
-                Kdiag_sub = np.real(self.Kdiag_sub(q, X[s, :-1]))
+                Kdiag_sub = np.real(self.Kdiag_sub(q1, X[s, :-1]))
                 np.copyto(target[s], Kdiag_sub)
-
         return target
 
-    def Kdiag_sub(self, q, X):
+
+    def Kdiag_sub_matrix(self, q1, X):
+        if self.unilateral_kernels[q1].type == "LFM":
+            Kdiag_sub = self.Kdiag_sub_LFM(q1, X)
+        elif self.unilateral_kernels[q1].type == "RBF":
+            Kdiag_sub = self.Kdiag_sub_RBF(q1, X)
+        return Kdiag_sub
+
+
+    def Kdiag_sub_LFM(self, q1, X):
 
         def lfmDiagComputeH3(gamma, sigma2, t, factor, preExp, mode):
             if mode:
@@ -565,27 +629,65 @@ class LFM(Kern):
             return vec
 
        # preExp = np.zeros((len(X), 2)).astype(np.complex128)
-        gamma_p = self.alpha[q] + 1j * self.omega[q]
-        gamma_m = self.alpha[q] - 1j * self.omega[q]
+        gamma_p = self.unilateral_kernels[q1].alpha + 1j * self.unilateral_kernels[q1].omega
+        gamma_m = self.unilateral_kernels[q1].alpha - 1j * self.unilateral_kernels[q1].omega
         preFactors = np.array([2 / (gamma_p + gamma_m) - 1 / gamma_m,
                                2 / (gamma_p + gamma_m) - 1 / gamma_p])
         preExp = np.hstack([np.exp(-gamma_p * X), np.exp(-gamma_m * X)])
-        sigma2 = self.scale[q]
+        sigma2 = self.unilateral_kernels[q1].scale
         # Actual computation of the kernel
         sk = lfmDiagComputeH3(-gamma_m, sigma2, X, preFactors[0], preExp[:, 1], 1)  \
             + lfmDiagComputeH3(-gamma_p, sigma2, X, preFactors[1], preExp[:, 0], 1)  \
             + lfmDiagComputeH4(gamma_m, sigma2, X, [gamma_m, (gamma_p + gamma_m)], np.hstack([preExp[:, 1][:,None], preExp[:, 0][:,None]]), 1)  \
             + lfmDiagComputeH4(gamma_p, sigma2, X, [gamma_p, (gamma_p + gamma_m)], preExp, 1)
         if self.isNormalised:
-            k0 = self.sensitivity[q] ** 2 / (8 * csqrt(2) * self.mass[q] ** 2 * self.omega[q] ** 2)
+            k0 = self.unilateral_kernels[q1].sensitivity ** 2 / (8 * csqrt(2) * self.unilateral_kernels[q1].mass ** 2 * self.unilateral_kernels[q1].omega ** 2)
         else:
-            k0 = csqrt(np.pi) * self.sigma[q] * self.sensitivity[q] ** 2 / (8 * self.mass[q] ** 2 * self.omega[q] ** 2)
+            k0 = csqrt(np.pi) * self.unilateral_kernels[q1].sigma * self.unilateral_kernels[q1].sensitivity ** 2 / (8 * self.unilateral_kernels[q1].mass ** 2 * self.unilateral_kernels[q1].omega ** 2)
         k = k0 * sk
         return k
 
 
+    def reset_gradients(self):
+        self.scale.gradient = np.zeros_like(self.scale.gradient)
+        self.mass.gradient = np.zeros_like(self.mass.gradient)
+        self.spring.gradient = np.zeros_like(self.spring.gradient)
+        self.damper.gradient = np.zeros_like(self.damper.gradient)
+        self.sensitivity.gradient = np.zeros_like(self.sensitivity.gradient)
 
-    def _update_gradients(self, q, q2, X, X2=None, dL_dK=None, meanVector=None):
+    def update_gradients_full(self, dL_dK, X, X2=None):
+        self.reset_gradients()
+        if X2 is None:
+            X2 = X
+        slices = index_to_slices(X[:, self.index_dim])
+        slices2 = index_to_slices(X2[:, self.index_dim])
+        normaliseRegardingToBatchSize = 0
+        g = np.zeros((self.output_dim, 5))
+        slices2 = index_to_slices(X2[:, self.index_dim])
+        for j in range(len(slices2)):
+            for i in range(len(slices)):
+                for l in range(len(slices2[j])):
+                    for k in range(len(slices[i])):
+                        if self.unilateral_kernels[i].type == "LFM" and self.unilateral_kernels[i].type == "LFM":
+                            [g1,g2]=self._update_gradients_LFMXLFM(i, j, X[slices[i][k], :-1], X2[slices2[j][l], :-1],
+                                                           dL_dK[slices[i][k], slices2[j][l]])
+                        elif self.unilateral_kernels[i].type == "LFM" and self.unilateral_kernels[i].type == "RBF":
+                            [g1,g2]=self._update_gradients_LFMXRBF(i, j, X[slices[i][k], :-1], X2[slices2[j][l], :-1],
+                                                           dL_dK[slices[i][k], slices2[j][l]])
+                        elif self.unilateral_kernels[i].type == "RBF" and self.unilateral_kernels[i].type == "RBF":
+                            [g1,g2]=self._update_gradients_RBFXRBF(i, j, X[slices[i][k], :-1], X2[slices2[j][l], :-1],
+                                                           dL_dK[slices[i][k], slices2[j][l]])
+                        normaliseRegardingToBatchSize +=1
+                        g[i] += g1 + g2
+                        #g[j]
+        normalisedg = g.sum(axis=0)/normaliseRegardingToBatchSize
+        self.scale.gradient += (normalisedg[:, 3])
+        self.mass.gradient += normalisedg[:, 0]
+        self.spring.gradient += normalisedg[:, 1]
+        self.damper.gradient += normalisedg[:, 2]
+        self.sensitivity.gradient += normalisedg[:, 4]
+
+    def _update_gradients_LFMXLFM(self, q1, q2, X, X2=None, dL_dK=None, meanVector=None):
         """
         Given the derivative of the objective wrt the covariance matrix
         (dL_dK), compute the gradient wrt the parameters of this kernel,
@@ -611,7 +713,9 @@ class LFM(Kern):
         #
         # SEEALSO : multiKernParamInit, multiKernCompute, lfmKernParamInit, lfmKernExtractParam
         #
-        # COPYRIGHT : David Luengo, 2007, 2008, Mauricio Alvarez, 2008
+        # COPYRIGHT : Tianqi Wei
+
+        # Modified based on the Matlab codes by: David Luengo, 2007, 2008, Mauricio Alvarez, 2008
         #
         # MODIFICATIONS : Neil D. Lawrence, 2007
         #
@@ -621,41 +725,44 @@ class LFM(Kern):
 
         subComponent = False  # This is just a flag that indicates if this kernel is part of a bigger kernel (SDLFM)
         covGrad = dL_dK
-        if covGrad is None and  meanVector is None:
+        if covGrad is None and meanVector is None:
             covGrad = X2
             X2 = X
-        elif covGrad is not None and  meanVector is not None:
+        elif covGrad is not None and meanVector is not None:
             subComponent = True
             if np.size(meanVector) > 1:
                 if np.shape(meanVector, 1) == 1:
-                    assert np.shape(meanVector, 2)==np.shape(covGrad, 2), 'The dimensions of meanVector don''t correspond to the dimensions of covGrad'
+                    assert np.shape(meanVector, 2) == np.shape(covGrad,
+                                                               2), 'The dimensions of meanVector don''t correspond to the dimensions of covGrad'
                 else:
-                    assert np.shape(meanVector.conj().T, 2)==np.shape(covGrad,2), 'The dimensions of meanVector don''t correspond to the dimensions of covGrad'
+                    assert np.shape(meanVector.conj().T, 2) == np.shape(covGrad,
+                                                                        2), 'The dimensions of meanVector don''t correspond to the dimensions of covGrad'
             else:
                 if np.size(X) == 1 and np.size(X2) > 1:
                     # matGrad will be row vector and so should be covGrad
                     dimcovGrad = np.max(np.shape((covGrad)))
-                    covGrad = covGrad.reshape(1, dimcovGrad,order='F').copy()
+                    covGrad = covGrad.reshape(1, dimcovGrad, order='F').copy()
                 elif np.size(X) > 1 and np.size(X2) == 1:
                     # matGrad will be column vector and sp should be covGrad
                     dimcovGrad = np.shape.max(covGrad)
-                    covGrad = covGrad.reshape(dimcovGrad,1,order='F').copy()
+                    covGrad = covGrad.reshape(dimcovGrad, 1, order='F').copy()
 
-        assert np.shape(X)[1] == 1 or np.shape(X2)[1] == 1,  'Input can only have one column. np.shape(X) = ' + str(np.shape(X)) + 'np.shape(X2) =' + str(np.shape(X2))
-        assert  self.scale[q] == self.scale[q2], '''Kernels cannot be cross combined if they have different inverse 
-                                                 widths. self.scale[%d] = %.5f = self.scale[%d] = %.5f''' % (q, q2, self.scale[q], self.scale[q2])
+        assert np.shape(X)[1] == 1 or np.shape(X2)[1] == 1, 'Input can only have one column. np.shape(X) = ' + str(
+            np.shape(X)) + 'np.shape(X2) =' + str(np.shape(X2))
+        assert self.unilateral_kernels[q1].scale == self.unilateral_kernels[
+            q2].scale, 'Kernels cannot be cross combined if they have different inverse widths.'
 
         # Parameters of the simulation (in the order provided by kernExtractParam in the matlab code)
-        index = np.array([q,q2])
-        m =self.mass[index] # Par. 1
-        D =self.spring[index]  # Par. 2
-        C =self.damper[index] # Par. 3
-        sigma2 = self.scale[q] # Par. 4
+        index = np.array([q, q2])
+        m = self.mass[index]  # Par. 1
+        D = self.spring[index]  # Par. 2
+        C = self.damper[index]  # Par. 3
+        sigma2 = 2 / self.unilateral_kernels[q1].inv_l  # Par. 4
         sigma = csqrt(sigma2)
-        S =self.sensitivity[index]  # Par. 5
+        S = self.sensitivity[index]  # Par. 5
 
-        alpha = C/ (2 * m)
-        omega = csqrt(D/ m-alpha** 2)
+        alpha = C / (2 * m)
+        omega = csqrt(D / m - alpha ** 2)
 
         # Initialization of vectors and matrices
 
@@ -672,25 +779,26 @@ class LFM(Kern):
             gradientUpsilonVector = cell(2, 1)
             gamma1 = alpha[0] + 1j * omega[0]
             gamma2 = alpha[1] + 1j * omega[1]
-            gradientUpsilonMatrix[0]= lfmGradientUpsilonMatrix(gamma1, sigma2, X, X2)
-            gradientUpsilonMatrix[1]= lfmGradientUpsilonMatrix(gamma2, sigma2, X2, X)
-            gradientUpsilonVector[0]= lfmGradientUpsilonVector(gamma1, sigma2, X)
-            gradientUpsilonVector[1]= lfmGradientUpsilonVector(gamma2, sigma2, X2)
-            preGamma= np.array([gamma1 + gamma2, np.conj(gamma1) + gamma2])
+            gradientUpsilonMatrix[0] = lfmGradientUpsilonMatrix(gamma1, sigma2, X, X2)
+            gradientUpsilonMatrix[1] = lfmGradientUpsilonMatrix(gamma2, sigma2, X2, X)
+            gradientUpsilonVector[0] = lfmGradientUpsilonVector(gamma1, sigma2, X)
+            gradientUpsilonVector[1] = lfmGradientUpsilonVector(gamma2, sigma2, X2)
+            preGamma = np.array([gamma1 + gamma2, np.conj(gamma1) + gamma2])
             preGamma2 = np.power(preGamma, 2)
             preConsX = 1 / preGamma
             preConsX2 = 1 / preGamma2
             preExp1 = np.exp(-gamma1 * X)
             preExp2 = np.exp(-gamma2 * X2)
-            preExpX = np.multiply(X,np.exp(-gamma1 * X))
+            preExpX = np.multiply(X, np.exp(-gamma1 * X))
             preExpX2 = np.multiply(X2, np.exp(-gamma2 * X2))
             [computeH[0], computeUpsilonMatrix[0]] = lfmComputeH3(gamma1, gamma2, sigma2, X, X2, preConsX, 0, 1)
-            [computeH[1], computeUpsilonMatrix[1]] = lfmComputeH3(gamma2, gamma1, sigma2, X2, X, preConsX[1] - preConsX[0], 0, 0)
-            [computeH[2], computeUpsilonVector[0]] = lfmComputeH4(gamma1, gamma2, sigma2, X, preGamma, preExp2, 0, 1  )
-            [computeH[3], computeUpsilonVector[1]] = lfmComputeH4(gamma2, gamma1, sigma2, X2, preGamma, preExp1, 0, 0 )
-            preKernel = np.real( computeH[0]+ computeH[1].T + computeH[2]+ computeH[3].T)
+            [computeH[1], computeUpsilonMatrix[1]] = lfmComputeH3(gamma2, gamma1, sigma2, X2, X,
+                                                                  preConsX[1] - preConsX[0], 0, 0)
+            [computeH[2], computeUpsilonVector[0]] = lfmComputeH4(gamma1, gamma2, sigma2, X, preGamma, preExp2, 0, 1)
+            [computeH[3], computeUpsilonVector[1]] = lfmComputeH4(gamma2, gamma1, sigma2, X2, preGamma, preExp1, 0, 0)
+            preKernel = np.real(computeH[0] + computeH[1].T + computeH[2] + computeH[3].T)
         else:
-            computeH  = cell(4, 1)
+            computeH = cell(4, 1)
             computeUpsilonMatrix = cell(2, 1)
             computeUpsilonVector = cell(2, 1)
             gradientUpsilonMatrix = cell(4, 1)
@@ -699,22 +807,22 @@ class LFM(Kern):
             gamma1_m = alpha[0] - 1j * omega[0]
             gamma2_p = alpha[1] + 1j * omega[1]
             gamma2_m = alpha[1] - 1j * omega[1]
-            gradientUpsilonMatrix[0]= lfmGradientUpsilonMatrix(gamma1_p, sigma2, X, X2)
-            gradientUpsilonMatrix[1]= lfmGradientUpsilonMatrix(gamma1_m, sigma2, X, X2)
-            gradientUpsilonMatrix[2]= lfmGradientUpsilonMatrix(gamma2_p, sigma2, X2, X)
-            gradientUpsilonMatrix[3]= lfmGradientUpsilonMatrix(gamma2_m, sigma2, X2, X)
-            gradientUpsilonVector[0]= lfmGradientUpsilonVector(gamma1_p, sigma2, X)
-            gradientUpsilonVector[1]= lfmGradientUpsilonVector(gamma1_m, sigma2, X)
-            gradientUpsilonVector[2]= lfmGradientUpsilonVector(gamma2_p, sigma2, X2)
-            gradientUpsilonVector[3]= lfmGradientUpsilonVector(gamma2_m, sigma2, X2)
+            gradientUpsilonMatrix[0] = lfmGradientUpsilonMatrix(gamma1_p, sigma2, X, X2)
+            gradientUpsilonMatrix[1] = lfmGradientUpsilonMatrix(gamma1_m, sigma2, X, X2)
+            gradientUpsilonMatrix[2] = lfmGradientUpsilonMatrix(gamma2_p, sigma2, X2, X)
+            gradientUpsilonMatrix[3] = lfmGradientUpsilonMatrix(gamma2_m, sigma2, X2, X)
+            gradientUpsilonVector[0] = lfmGradientUpsilonVector(gamma1_p, sigma2, X)
+            gradientUpsilonVector[1] = lfmGradientUpsilonVector(gamma1_m, sigma2, X)
+            gradientUpsilonVector[2] = lfmGradientUpsilonVector(gamma2_p, sigma2, X2)
+            gradientUpsilonVector[3] = lfmGradientUpsilonVector(gamma2_m, sigma2, X2)
             preExp1 = np.zeros((np.max(np.shape(X), 2)))
             preExp2 = np.zeros((np.max(np.shape(X2), 2)))
             preExpX = np.zeros((np.max(np.shape(X), 2)))
             preExpX2 = np.zeros((np.max(np.shape(X2), 2)))
             preGamma = np.array([gamma1_p + gamma2_p,
-                                   gamma1_p + gamma2_m,
-                                   gamma1_m + gamma2_p,
-                                   gamma1_m + gamma2_m])
+                                 gamma1_p + gamma2_m,
+                                 gamma1_m + gamma2_p,
+                                 gamma1_m + gamma2_m])
             preGamma2 = np.power(preGamma, 2)
             preConsX = 1 / preGamma
             preConsX2 = 1 / preGamma2
@@ -734,14 +842,18 @@ class LFM(Kern):
             preExpX[:, 1] = X * np.exp(-gamma1_m * X)
             preExpX2[:, 0] = X2 * np.exp(-gamma2_p * X2)
             preExpX2[:, 1] = X2 * np.exp(-gamma2_m * X2)
-            [computeH[0], computeUpsilonMatrix[0]] = lfmComputeH3(gamma1_p, gamma1_m, sigma2, X, X2, preFactors[1, 2], 1)
-            [computeH[1], computeUpsilonMatrix[1]] = lfmComputeH3(gamma2_p, gamma2_m, sigma2, X2, X, preFactors[3, 4], 1)
-            [computeH[2], computeUpsilonVector[0]] = lfmComputeH4(gamma1_p, gamma1_m, sigma2, X, preGamma[1, 2, 4, 3], preExp2, 1)
-            [computeH[3], computeUpsilonVector[1]] = lfmComputeH4(gamma2_p, gamma2_m, sigma2, X2, preGamma[1, 3, 4, 2], preExp1, 1)
-            preKernel = computeH[0]+ computeH[1].T + computeH[2]+ computeH[3].T
+            [computeH[0], computeUpsilonMatrix[0]] = lfmComputeH3(gamma1_p, gamma1_m, sigma2, X, X2, preFactors[1, 2],
+                                                                  1)
+            [computeH[1], computeUpsilonMatrix[1]] = lfmComputeH3(gamma2_p, gamma2_m, sigma2, X2, X, preFactors[3, 4],
+                                                                  1)
+            [computeH[2], computeUpsilonVector[0]] = lfmComputeH4(gamma1_p, gamma1_m, sigma2, X, preGamma[1, 2, 4, 3],
+                                                                  preExp2, 1)
+            [computeH[3], computeUpsilonVector[1]] = lfmComputeH4(gamma2_p, gamma2_m, sigma2, X2, preGamma[1, 3, 4, 2],
+                                                                  preExp1, 1)
+            preKernel = computeH[0] + computeH[1].T + computeH[2] + computeH[3].T
 
         if np.all(np.isreal(omega)):
-            if self.isNormalised[q]:
+            if self.unilateral_kernels[q1].isNormalised:
                 K0 = np.prod(S) / (4 * csqrt(2) * np.prod(m) * np.prod(omega))
             else:
                 K0 = sigma * np.prod(S) * csqrt(np.pi) / (4 * np.prod(m) * np.prod(omega))
@@ -755,11 +867,11 @@ class LFM(Kern):
         for ind_theta in np.arange(3):  # Parameter (m, D or C)
             for ind_par in np.arange(2):  # System (1 or 2)
                 # Choosing the right gradients for m, omega, gamma1 and gamma2
-                if ind_theta == 0: # Gradient wrt m
+                if ind_theta == 0:  # Gradient wrt m
                     gradThetaM = [1 - ind_par, ind_par]
                     gradThetaAlpha = -C / (2 * np.power(m, 2))
-                    gradThetaOmega = (np.power(C,2) - 2 * m * D) / (2 * (m ** 2) * csqrt(4 * m * D - C ** 2))
-                if ind_theta == 1: # Gradient wrt D
+                    gradThetaOmega = (np.power(C, 2) - 2 * m * D) / (2 * (m ** 2) * csqrt(4 * m * D - C ** 2))
+                if ind_theta == 1:  # Gradient wrt D
                     gradThetaM = np.zeros((2))
                     gradThetaAlpha = np.zeros((2))
                     gradThetaOmega = 1 / csqrt(4 * m * D - np.power(C, 2))
@@ -784,7 +896,8 @@ class LFM(Kern):
                                           + lfmGradientH32(preGamma2, gradThetaGamma1, computeUpsilonMatrix[1],
                                                            1, 0, 0).T
                                           + lfmGradientH41(preGamma, preGamma2, gradThetaGamma1, preExp2,
-                                                           gradientUpsilonVector[0], 1, computeUpsilonVector[0], 1, 0, 1)
+                                                           gradientUpsilonVector[0], 1, computeUpsilonVector[0], 1, 0,
+                                                           1)
                                           + lfmGradientH42(preGamma, preGamma2, gradThetaGamma1, preExp1, preExpX,
                                                            computeUpsilonVector[1], 1, 0, 0).T \
                                           - (gradThetaM[ind_par] / m[ind_par]
@@ -794,13 +907,15 @@ class LFM(Kern):
                                   np.real(lfmGradientH31((preConsX[1] - preConsX[0]), (-preConsX2[1] + preConsX2[0]),
                                                          gradThetaGamma2, gradientUpsilonMatrix[1], 1,
                                                          computeUpsilonMatrix[1], 1, 0, 0).T
-                                          + lfmGradientH32(preConsX2, gradThetaGamma2, computeUpsilonMatrix[0],1, 0, 1)
+                                          + lfmGradientH32(preConsX2, gradThetaGamma2, computeUpsilonMatrix[0], 1, 0, 1)
                                           + lfmGradientH41(preGamma, preGamma2, gradThetaGamma2, preExp1,
-                                                           gradientUpsilonVector[1], 1, computeUpsilonVector[1], 1, 0, 0).T
+                                                           gradientUpsilonVector[1], 1, computeUpsilonVector[1], 1, 0,
+                                                           0).T
                                           + lfmGradientH42(preGamma, preGamma2, gradThetaGamma2, preExp2, preExpX2,
                                                            computeUpsilonVector[0], 1, 0, 1) \
-                                          - (gradThetaM[ind_par] / m[ind_par] + gradThetaOmega[ind_par] / omega[ind_par])
-                                            * preKernel)
+                                          - (gradThetaM[ind_par] / m[ind_par] + gradThetaOmega[ind_par] / omega[
+                                      ind_par])
+                                          * preKernel)
 
                 else:
 
@@ -809,30 +924,41 @@ class LFM(Kern):
                     gradThetaGamma1 = gradThetaGamma11
 
                     if not ind_par:  # ind_par = k
-                        matGrad = K0 *  \
-                                    (lfmGradientH31(preFactors[np.array([0,1])], preFactors2[np.array([0,1])], gradThetaGamma1, gradientUpsilonMatrix[0],    # preFactors[0,1], preFactors2[0,1], gradThetaGamma1, gradientUpsilonMatrix[0],
-                                                    gradientUpsilonMatrix[1], computeUpsilonMatrix[0][0], computeUpsilonMatrix[0][1], 1)
-                                    + lfmGradientH32(preGamma2, gradThetaGamma1, computeUpsilonMatrix[1][0], computeUpsilonMatrix[1][1], 1).T
-                                    + lfmGradientH41(preGamma, preGamma2, gradThetaGamma1, preExp2, gradientUpsilonVector[0],
-                                                     gradientUpsilonVector[1], computeUpsilonVector[0][0], computeUpsilonVector[0][1], 1)
-                                    + lfmGradientH42(preGamma, preGamma2, gradThetaGamma1, preExp1, preExpX, computeUpsilonVector[1][0],
-                                                     computeUpsilonVector[1][1], 1).T
-                                    - (gradThetaM[ind_par] / m[ind_par]+ gradThetaOmega[ind_par] / omega[ind_par]) * preKernel)
+                        matGrad = K0 * \
+                                  (lfmGradientH31(preFactors[np.array([0, 1])], preFactors2[np.array([0, 1])],
+                                                  gradThetaGamma1, gradientUpsilonMatrix[0],
+                                                  # preFactors[0,1], preFactors2[0,1], gradThetaGamma1, gradientUpsilonMatrix[0],
+                                                  gradientUpsilonMatrix[1], computeUpsilonMatrix[0][0],
+                                                  computeUpsilonMatrix[0][1], 1)
+                                   + lfmGradientH32(preGamma2, gradThetaGamma1, computeUpsilonMatrix[1][0],
+                                                    computeUpsilonMatrix[1][1], 1).T
+                                   + lfmGradientH41(preGamma, preGamma2, gradThetaGamma1, preExp2,
+                                                    gradientUpsilonVector[0],
+                                                    gradientUpsilonVector[1], computeUpsilonVector[0][0],
+                                                    computeUpsilonVector[0][1], 1)
+                                   + lfmGradientH42(preGamma, preGamma2, gradThetaGamma1, preExp1, preExpX,
+                                                    computeUpsilonVector[1][0],
+                                                    computeUpsilonVector[1][1], 1).T
+                                   - (gradThetaM[ind_par] / m[ind_par] + gradThetaOmega[ind_par] / omega[
+                                              ind_par]) * preKernel)
 
                     else:  # ind_par = r
                         matGrad = K0 * \
-                                  (lfmGradientH31(preFactors[2,3], preFactors2[2,3], gradThetaGamma2,
+                                  (lfmGradientH31(preFactors[2, 3], preFactors2[2, 3], gradThetaGamma2,
                                                   gradientUpsilonMatrix[2], gradientUpsilonMatrix[3],
                                                   computeUpsilonMatrix[1][0], computeUpsilonMatrix[1][1], 1).T
-                                   + lfmGradientH32(preGamma2([0, 2, 1, 3]), gradThetaGamma2, computeUpsilonMatrix[0][0],
+                                   + lfmGradientH32(preGamma2([0, 2, 1, 3]), gradThetaGamma2,
+                                                    computeUpsilonMatrix[0][0],
                                                     computeUpsilonMatrix[0][1], 1)
-                                   + lfmGradientH41(preGamma[0,2,1,3], preGamma2[0,2,1,3], gradThetaGamma2, preExp1,
+                                   + lfmGradientH41(preGamma[0, 2, 1, 3], preGamma2[0, 2, 1, 3], gradThetaGamma2,
+                                                    preExp1,
                                                     gradientUpsilonVector[2], gradientUpsilonVector[3],
-                                                    computeUpsilonVector[1][0],computeUpsilonVector[1][1], 1).T
-                                   + lfmGradientH42(preGamma[0,2,1,3], preGamma2[0,2,1,3], gradThetaGamma2, preExp2,
+                                                    computeUpsilonVector[1][0], computeUpsilonVector[1][1], 1).T
+                                   + lfmGradientH42(preGamma[0, 2, 1, 3], preGamma2[0, 2, 1, 3], gradThetaGamma2,
+                                                    preExp2,
                                                     preExpX2, computeUpsilonVector[0][0], computeUpsilonVector[0][1], 1)
                                    - (gradThetaM[ind_par] / m[ind_par] + gradThetaOmega[ind_par] / omega[ind_par])
-                                     * preKernel)
+                                   * preKernel)
 
                 if subComponent:
                     if np.shape(meanVector)[0] == 1:
@@ -845,40 +971,40 @@ class LFM(Kern):
                 else:
                     g2[ind_theta] = sum(sum(matGrad * covGrad))
 
-
         # Gradients with respect to sigma
 
         if np.all(np.isreal(omega)):
-            if self.isNormalised[q]:
+            if self.unilateral_kernels[q1].isNormalised:
                 matGrad = K0 * \
-                          np.real(lfmGradientSigmaH3(gamma1, gamma2, sigma2, X, X2, preConsX, 0, 1)\
-                                  + lfmGradientSigmaH3(gamma2, gamma1, sigma2, X2, X, preConsX[1] - preConsX[0], 0, 0).T\
-                                  + lfmGradientSigmaH4(gamma1, gamma2, sigma2, X, preGamma, preExp2, 0, 1  )\
-                                  + lfmGradientSigmaH4(gamma2, gamma1, sigma2, X2, preGamma, preExp1, 0, 0 ).T)
+                          np.real(lfmGradientSigmaH3(gamma1, gamma2, sigma2, X, X2, preConsX, 0, 1) \
+                                  + lfmGradientSigmaH3(gamma2, gamma1, sigma2, X2, X, preConsX[1] - preConsX[0], 0, 0).T \
+                                  + lfmGradientSigmaH4(gamma1, gamma2, sigma2, X, preGamma, preExp2, 0, 1) \
+                                  + lfmGradientSigmaH4(gamma2, gamma1, sigma2, X2, preGamma, preExp1, 0, 0).T)
             else:
                 matGrad = (np.prod(S) * csqrt(np.pi) / (4 * np.prod(m) * np.prod(omega))) \
                           * np.real(preKernel
                                     + sigma
-                                      * (lfmGradientSigmaH3(gamma1, gamma2, sigma2, X, X2, preConsX, 0, 1)
-                                        +  lfmGradientSigmaH3(gamma2, gamma1, sigma2, X2, X, preConsX[1] - preConsX[0], 0, 0).T
-                                        +  lfmGradientSigmaH4(gamma1, gamma2, sigma2, X, preGamma, preExp2, 0, 1  )
-                                        +  lfmGradientSigmaH4(gamma2, gamma1, sigma2, X2, preGamma, preExp1, 0, 0 ).T))
+                                    * (lfmGradientSigmaH3(gamma1, gamma2, sigma2, X, X2, preConsX, 0, 1)
+                                       + lfmGradientSigmaH3(gamma2, gamma1, sigma2, X2, X, preConsX[1] - preConsX[0], 0,
+                                                            0).T
+                                       + lfmGradientSigmaH4(gamma1, gamma2, sigma2, X, preGamma, preExp2, 0, 1)
+                                       + lfmGradientSigmaH4(gamma2, gamma1, sigma2, X2, preGamma, preExp1, 0, 0).T))
         else:
-            if self.isNormalised[q]:
+            if self.unilateral_kernels[q1].isNormalised:
                 matGrad = K0 * \
-                          (lfmGradientSigmaH3(gamma1_p, gamma1_m, sigma2, X, X2, preFactors[0,1], 1)\
-                           +  lfmGradientSigmaH3(gamma2_p, gamma2_m, sigma2, X2, X, preFactors[2,3], 1).T\
-                           +  lfmGradientSigmaH4(gamma1_p, gamma1_m, sigma2, X, preGamma[0,1,3,2], preExp2, 1 )\
-                           +  lfmGradientSigmaH4(gamma2_p, gamma2_m, sigma2, X2, preGamma[0,2,3,1], preExp1, 1 ).T )
+                          (lfmGradientSigmaH3(gamma1_p, gamma1_m, sigma2, X, X2, preFactors[0, 1], 1) \
+                           + lfmGradientSigmaH3(gamma2_p, gamma2_m, sigma2, X2, X, preFactors[2, 3], 1).T \
+                           + lfmGradientSigmaH4(gamma1_p, gamma1_m, sigma2, X, preGamma[0, 1, 3, 2], preExp2, 1) \
+                           + lfmGradientSigmaH4(gamma2_p, gamma2_m, sigma2, X2, preGamma[0, 2, 3, 1], preExp1, 1).T)
             else:
                 matGrad = (np.prod(S) * csqrt(np.pi) / (8 * np.prod(m) * np.prod(omega))) \
-                        * (preKernel
-                           + sigma
-                             * (lfmGradientSigmaH3(gamma1_p, gamma1_m, sigma2, X, X2, preFactors[0,1], 1)\
-                             + lfmGradientSigmaH3(gamma2_p, gamma2_m, sigma2, X2, X, preFactors[2,3], 1).T\
-                             + lfmGradientSigmaH4(gamma1_p, gamma1_m, sigma2, X, preGamma[0,1,3,2], preExp2, 1 )\
-                             + lfmGradientSigmaH4(gamma2_p, gamma2_m, sigma2, X2, preGamma[0,2,3,1], preExp1, 1 ).T ))
-
+                          * (preKernel
+                             + sigma
+                             * (lfmGradientSigmaH3(gamma1_p, gamma1_m, sigma2, X, X2, preFactors[0, 1], 1) \
+                                + lfmGradientSigmaH3(gamma2_p, gamma2_m, sigma2, X2, X, preFactors[2, 3], 1).T \
+                                + lfmGradientSigmaH4(gamma1_p, gamma1_m, sigma2, X, preGamma[0, 1, 3, 2], preExp2, 1) \
+                                + lfmGradientSigmaH4(gamma2_p, gamma2_m, sigma2, X2, preGamma[0, 2, 3, 1], preExp1,
+                                                     1).T))
 
         if subComponent:
             if np.shape(meanVector)[0] == 1:
@@ -892,7 +1018,7 @@ class LFM(Kern):
         # Gradients with respect to S
 
         if np.all(np.isreal(omega)):
-            if self.isNormalised[q]:
+            if self.unilateral_kernels[q1].isNormalised:
                 matGrad = (1 / (4 * csqrt(2) * np.prod(m) * np.prod(omega))) * np.real(preKernel)
             else:
                 matGrad = (sigma * csqrt(np.pi) / (4 * np.prod(m) * np.prod(omega))) * np.real(preKernel)
@@ -902,12 +1028,11 @@ class LFM(Kern):
             else:
                 matGrad = (sigma * csqrt(np.pi) / (8 * np.prod(m) * np.prod(omega))) * (preKernel)
 
-
         if subComponent:
             if np.shape(meanVector)[0] == 1:
                 matGrad = matGrad * meanVector
             else:
-                    matGrad = (meanVector * matGrad).T
+                matGrad = (meanVector * matGrad).T
         g1[4] = sum(sum(S[1] * matGrad * covGrad))
         g2[4] = sum(sum(S[0] * matGrad * covGrad))
 
@@ -919,53 +1044,9 @@ class LFM(Kern):
         # scale = 2/inverse width
 
         return [g1, g2]
-    
 
-    def reset_gradients(self):
-        self.scale.gradient = np.zeros_like(self.scale.gradient)
-        self.mass.gradient = np.zeros_like(self.mass.gradient)
-        self.spring.gradient = np.zeros_like(self.spring.gradient)
-        self.damper.gradient = np.zeros_like(self.damper.gradient)
-        self.sensitivity.gradient = np.zeros_like(self.sensitivity.gradient)
 
-    def update_gradients_full(self, dL_dK, X, X2=None):
-        self.reset_gradients()
-        if X2 is None:
-            X2 = X
-        slices = index_to_slices(X[:, self.index_dim])
-        slices2 = index_to_slices(X2[:, self.index_dim])
-        normaliseRegardingToBatchSize = 0
-        g = np.zeros((self.output_dim, 5))
-        if X2 is not None:
-            slices2 = index_to_slices(X2[:, self.index_dim])
-
-            for j in range(len(slices2)):
-                for i in range(len(slices)):
-                    for l in range(len(slices2[j])):
-                        for k in range(len(slices[i])):
-                            [g1,g2]=self._update_gradients(i, j, X[slices[i][k], :-1], X2[slices2[j][l], :-1],
-                                                           dL_dK[slices[i][k], slices2[j][l]])
-                            normaliseRegardingToBatchSize +=1
-                            g[i] += g1 + g2
-                            #g[j]
-        else:
-            for j in range(len(slices2)):
-                for i in range(len(slices)):
-                    for l in range(len(slices2[j])):
-                        for k in range(len(slices[i])):
-                            [g1,g2]=self._update_gradients(i, j, X[slices[i][k], :-1], X2[slices2[j][l], :-1],
-                                                           dL_dK[slices[i][k], slices2[j][l]])
-                            normaliseRegardingToBatchSize += 1
-                            g[i] += g1  + g2
-                           # g[j] += g2
-        normalisedg = g/normaliseRegardingToBatchSize
-        self.scale.gradient += np.sum([(normalisedg[:, 3]) * (-2 / np.power(self.scale, 2))])/2
-        self.mass.gradient += normalisedg[:, 0]
-        self.spring.gradient += normalisedg[:, 1]
-        self.damper.gradient += normalisedg[:, 2]
-        self.sensitivity.gradient += normalisedg[:, 4]
-
-    def _update_gradients_diag_wrapper(self, q, X, dL_dKdiag):
+    def _update_gradients_diag_wrapper(self, q1, X, dL_dKdiag):
         #  LFMKERNDIAGGRADIENT Compute the gradient of the LFM kernel's diagonal wrt parameters.
         #  FORMAT
         #  DESC computes the gradient of functions of the diagonal of the
@@ -984,12 +1065,12 @@ class LFM(Kern):
         assert np.shape(X)[1] == 1, 'Input can only have one column'
 
         # Parameters of the simulation (in the order providen by kernExtractParam)
-        m = self.mass[q] # Par. 1
-        D = self.spring[q]# Par. 2
-        C = self.damper[q] # Par. 3
-        sigma2 = self.scale[q]  # Par. 4
+        m = self.unilateral_kernels[q1].mass # Par. 1
+        D = self.unilateral_kernels[q1].spring# Par. 2
+        C = self.unilateral_kernels[q1].damper # Par. 3
+        sigma2 = self.unilateral_kernels[q1].inv_l  # Par. 4
         sigma = csqrt(sigma2)
-        S = self.sensitivity[q]  # Par. 5
+        S = self.unilateral_kernels[q1].sensitivity # Par. 5
 
         alpha = C / (2 * m)
         omega = csqrt(D / m - alpha ** 2)
@@ -1023,10 +1104,10 @@ class LFM(Kern):
 
         preKernel = diagH[0] + diagH[1] + diagH[2] + diagH[3]
 
-        if self.isNormalised[q]:
-            k0 = np.power(self.sensitivity[q], 2) / (8 * csqrt(2) * np.power(self.mass[q], 2) * np.power(omega,2))
+        if self.unilateral_kernels[q1].isNormalised:
+            k0 = np.power(self.unilateral_kernels[q1].sensitivity, 2) / (8 * csqrt(2) * np.power(self.unilateral_kernels[q1].mass, 2) * np.power(omega,2))
         else:
-            k0 = csqrt(np.pi) * sigma * np.power(self.sensitivity[q], 2) / (8 * np.power(self.mass[q], 2) * np.power(omega, 2))
+            k0 = csqrt(np.pi) * sigma * np.power(self.unilateral_kernels[q1].sensitivity, 2) / (8 * np.power(self.unilateral_kernels[q1].mass, 2) * np.power(omega, 2))
 
         # Gradient with respect to m, D and C
         for ind_theta in range(3):  # Parameter (m, D or C)
@@ -1060,7 +1141,7 @@ class LFM(Kern):
         g[ind_theta] = k0 * sum(sum(matGrad * dL_dKdiag))
 
         # Gradients with respect to sigma
-        if self.isNormalised[q]:
+        if self.unilateral_kernels[q1].isNormalised:
             matGrad = k0 * \
                       (lfmDiagGradientSH3(-gamma_m, sigma2, X, preFactors[0], preExp[:, 1], 1)
                        + lfmDiagGradientSH3(-gamma_p, sigma2, X, preFactors[1], preExp[:, 0], 1)
@@ -1080,7 +1161,7 @@ class LFM(Kern):
 
             # Gradients with respect to S
 
-        if self.isNormalised[q]:
+        if self.unilateral_kernels[q1].isNormalised:
             matGrad = (1 / (8 * csqrt(2) * m ** 2 * omega ** 2)) *(preKernel)
         else:
             matGrad = (sigma * csqrt(np.pi) / (8 * m ** 2 * omega ** 2)) *(preKernel)
@@ -1099,15 +1180,12 @@ class LFM(Kern):
                 g[i]=self._update_gradients_diag_wrapper(i, X[slices[i][k], :], dL_dKdiag[slices[i][k]])
                 normaliseRegardingToBatchSize += 1
         normalisedg = g/normaliseRegardingToBatchSize
-        self.scale.gradient += (normalisedg[:, 3]) * (-2 / np.power(self.scale, 2))
-        self.mass.gradient += normalisedg[:, 0]
-        self.spring.gradient += normalisedg[:, 1]
-        self.damper.gradient += normalisedg[:, 2]
-        self.sensitivity.gradient += normalisedg[:, 4]
+        self.scale.gradient += (normalisedg[3]) * (-2 / np.power(self.scale, 2))
+        self.mass.gradient += normalisedg[0]
+        self.spring.gradient += normalisedg[1]
+        self.damper.gradient += normalisedg[2]
+        self.sensitivity.gradient += normalisedg[4]
         return normalisedg
-
-
-
 
 
 

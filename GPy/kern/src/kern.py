@@ -18,6 +18,7 @@ class Kern(Parameterized):
     # Here, we use the Python module six to support Py3 and Py2 simultaneously
     #===========================================================================
     _support_GPU = False
+
     def __init__(self, input_dim, active_dims, name, useGPU=False, *a, **kw):
         """
         The base class for a kernel: a positive definite function

@@ -220,7 +220,7 @@ class Stationary(Kern):
         kernel and likelihood gradients.
         Useful for when gradients have been computed a priori.
         """
-        self.variance.gradient = dL_dVar
+        self.variance.gradient = dL_dVar  # redefine???
         self.lengthscale.gradient = dL_dLen
 
     def _inv_dist(self, X, X2=None):

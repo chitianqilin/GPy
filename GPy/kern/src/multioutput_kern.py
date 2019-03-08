@@ -106,7 +106,7 @@ class MultioutputKern(CombinationKernel):
     def reset_gradients(self):
         for kern in self.kern: kern.reset_gradients()
 
-    def update_gradients_full(self,dL_dK, X, X2=None):
+    def update_gradients_full(self, dL_dK, X, X2=None):
         self.reset_gradients()
         slices = index_to_slices(X[:,self.index_dim])
         if X2 is not None:

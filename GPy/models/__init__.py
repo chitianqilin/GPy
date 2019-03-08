@@ -30,3 +30,4 @@ from .gp_grid_regression import GPRegressionGrid
 from .gp_multiout_regression import GPMultioutRegression
 from .gp_multiout_regression_md import GPMultioutRegressionMD
 from .tp_regression import TPRegression
+from .lfm_regression import LFMRegression
